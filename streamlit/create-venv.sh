@@ -5,7 +5,7 @@ python -m venv dh-streamlit-venv
 source dh-streamlit-venv/bin/activate
 
 # Install streamlit and dh streamlit plugin
-pip install streamlit streamlit-deephaven
+pip install streamlit streamlit-deephaven deephaven-ipywidgets jupyter cartopy PyQt5
 
 # Clone the web-plugin-packager repository
 git clone https://github.com/deephaven/web-plugin-packager.git
