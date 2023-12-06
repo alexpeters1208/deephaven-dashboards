@@ -182,6 +182,8 @@ MONTH_STR_TO_INT = {"January": 1, "February": 2, "March": 3, "April": 4, "May": 
 MONTH_INT_TO_STR = {1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
                     7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December"}
 
+WEEKDAY_STR_TO_INT = {"Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7}
+
 st.set_page_config(layout="wide")
 st.subheader("Austin Bikeshare Exploration")
 data_tab, time_tab, space_tab= st.tabs(["Raw Data", "Through Time", "Through Space"])
@@ -324,9 +326,6 @@ with time_tab:
                 show()
             display_dh(time_q1_plot)
 
-        with st.expander("How does subscription status affect the overall distribution of ride count?"):
-            st.write("This plot shows the distribution of ride count for annual subscribers and everyone else.")
-
         with st.expander("How does overall ride count trend compare from year to year?"):
             st.write("This plot shows trends from all three complete years. The differences in magnitude \
                      and variation have been removed to make the trend comparison as simple as possible.")
@@ -391,20 +390,71 @@ with time_tab:
                 .show()
             display_dh(time_q4_plot)
 
-        with st.expander("How does subscription status affect the overall distribution of ride count?"):
-            st.write("This plot shows the distribution of ride duration for annual subscribers and everyone else. \
-                     Interestingly, annual subscribers tend to take shorter trips.")
-
         with st.expander("How does subscription status affect the overall distribution of ride duration?"):
             st.write("This plot shows the distribution of ride duration for annual subscribers and everyone else. \
                      Interestingly, annual subscribers tend to take shorter trips.")
+            time_q5_plot = Figure(rows=2, cols=1). \
+                new_chart(row=0, col=0). \
+                plot_xy_hist(series_name="Annual subscribers",
+                             t=trips.where("subscriber_type == `Annual Membership`"),
+                             x="duration_minutes",
+                             nbins=50,
+                             xmin=0.0,
+                             xmax=100.0). \
+                new_chart(row=1, col=0). \
+                plot_xy_hist(series_name="Non-annual subscribers",
+                             t=trips.where("subscriber_type != `Annual Membership`"),
+                             x="duration_minutes",
+                             nbins=50,
+                             xmin=0.0,
+                             xmax=100.0). \
+                show()
+            display_dh(time_q5_plot)
 
         with st.expander("What percentage of trips over 500 minutes are taken by different types of subscribers?"):
-            st.write("This plot shows the percentage of trips over 500 minutes taken by each subscription type.")
+            st.write("This plot shows the percentage of trips over 500 minutes taken by each subscription type. The \
+                     majority of long trips are taken by walk-up customers.")
+            time_q6_plot = Figure(). \
+                plot_pie(series_name="Long Rides by Subscription Type",
+                         t=trips.where("duration_minutes > 500").count_by("count", by="subscriber_type"),
+                         category="subscriber_type",
+                         y="count"). \
+                show()
+            display_dh(time_q6_plot)
 
         with st.expander("Do users tend to take longer rides on the weekends?"):
             st.write("This plot shows the average and median number of rides taken each day of the week, aggregated \
                      over the entire dataset. ")
+            day_of_week_name_array = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            time_q7_table = trips. \
+                update(["day_of_week = dayOfWeek(start_time, 'CT')", ]). \
+                agg_by([agg.avg("duration_avg = duration_minutes"),
+                        agg.median("duration_med = duration_minutes")], by="day_of_week"). \
+                sort("day_of_week"). \
+                update("day_of_week_name = (String)day_of_week_name_array[i]")
 
-        with st.expander("another question"):
-            st.write("more")
+            time_q7_plot = Figure(). \
+                plot_cat(series_name="Average ride duration", t=time_q7_table, category="day_of_week_name",
+                         y="duration_avg"). \
+                plot_cat(series_name="Median ride duration", t=time_q7_table, category="day_of_week_name",
+                         y="duration_med"). \
+                show()
+            display_dh(time_q7_plot)
+
+        with st.expander("What is the overall intraday trend of ride duration for each day of the week?"):
+            st.write("This plot shows the median minutely ride duration within each day, aggregated over the entire \
+                     dataset.")
+            st.selectbox("Select a day.", (WEEKDAY_STR_TO_INT.keys()), key = "time_q8_day")
+            time_q8_table = trips. \
+                update(["day_of_week = dayOfWeek(start_time, 'CT')",
+                        "minute_of_day = minuteOfDay(start_time, 'CT')"]). \
+                agg_by(agg.median("duration_minutes"), by=["minute_of_day", "day_of_week"]). \
+                sort("minute_of_day")
+
+            time_q8_plot = Figure(). \
+                plot_xy(series_name="Median intraday ride duration",
+                        t=time_q8_table.where("day_of_week == (int)WEEKDAY_STR_TO_INT[st.session_state.time_q8_day]"),
+                        x="minute_of_day",
+                        y="duration_minutes"). \
+                show()
+            display_dh(time_q8_plot)
