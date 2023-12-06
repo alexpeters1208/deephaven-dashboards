@@ -18,6 +18,7 @@ import deephaven.agg as agg
 import deephaven.updateby as uby
 
 import deephaven.time as dhtu
+import deephaven.pandas as dhpd
 
 # other imports
 
@@ -25,149 +26,159 @@ import datetime as dt
 
 ############################################################ DATA #######################################################
 
+st.set_page_config(layout="wide")
+
 ### read in and clean data
+@st.cache_resource
+def create_tables():
 
-stations = read_csv("../data/static/austin_bikeshare_stations.csv")
-trips = read_csv("../data/static/austin_bikeshare_trips.csv")
+    stations = read_csv("../data/static/austin_bikeshare_stations.csv")
+    trips = read_csv("../data/static/austin_bikeshare_trips.csv")
 
-# drop unwanted columns, filter rows, change types
-stations = stations.drop_columns("location")
-trips = trips.\
-    drop_columns(["month", "year", "checkout_time", "end_station_name", "start_station_name"]).\
-    update(["bikeid = (int)bikeid",
-            "end_station_id = (int)end_station_id",
-            "start_station_id = (int)start_station_id"]).\
-    where(["!isNull(end_station_id)",
-           "!isNull(start_station_id)"]).\
-    update("start_time = parseInstant(start_time.replace(` `, `T`).concat(` CT`))")
+    # drop unwanted columns, filter rows, change types
+    stations = stations.drop_columns("location")
+    trips = trips.\
+        drop_columns(["month", "year", "checkout_time", "end_station_name", "start_station_name"]).\
+        update(["bikeid = (int)bikeid",
+                "end_station_id = (int)end_station_id",
+                "start_station_id = (int)start_station_id"]).\
+        where(["!isNull(end_station_id)",
+               "!isNull(start_station_id)"]).\
+        update("start_time = parseInstant(start_time.replace(` `, `T`).concat(` CT`))")
 
-# aggregate subscriber_type into fewer categories and eliminate subscriber types with fewer than 100 subs
-trips = trips.\
-    where("!isNull(subscriber_type)").\
-    update(["subscriber_type = subscriber_type.contains(`24`) ? `24-Hour Vendor` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`RideScout`) ? `24-Hour Vendor` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Republic`) ? `24-Hour Vendor` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Annual`) ? `Annual Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Local365`) ? `Annual Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Semester`) ? `Semester Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Local30`) ? `30-Day Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`7-Day`) ? `7-Day Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Weekender`) ? `Weekend Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Explorer`) ? `1-Day Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Founding`) ? `Founding Member` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`Try Before`) ? `Trial Membership` : subscriber_type",
-            "subscriber_type = subscriber_type.contains(`ACL`) ? `ACL` : subscriber_type"])
+    # aggregate subscriber_type into fewer categories and eliminate subscriber types with fewer than 100 subs
+    trips = trips.\
+        where("!isNull(subscriber_type)").\
+        update(["subscriber_type = subscriber_type.contains(`24`) ? `24-Hour Vendor` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`RideScout`) ? `24-Hour Vendor` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Republic`) ? `24-Hour Vendor` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Annual`) ? `Annual Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Local365`) ? `Annual Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Semester`) ? `Semester Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Local30`) ? `30-Day Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`7-Day`) ? `7-Day Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Weekender`) ? `Weekend Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Explorer`) ? `1-Day Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Founding`) ? `Founding Member` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`Try Before`) ? `Trial Membership` : subscriber_type",
+                "subscriber_type = subscriber_type.contains(`ACL`) ? `ACL` : subscriber_type"])
 
-trips = trips.\
-    join(trips.count_by("sub_count", by = "subscriber_type"), on = "subscriber_type", joins = "sub_count").\
-    where("sub_count >= 100").\
-    drop_columns("sub_count")
-
-
-### Frequency analysis
-
-# hourly and daily trip count
-hourly_ride_freq = trips.\
-    update(["hour = hourOfDay(start_time, 'CT')",
-            "hour = hour == 24 ? 23 : hour",
-            "timestamp = toInstant(toLocalDate(start_time, 'CT'), millisOfDayToLocalTime((hour * 60 * 60 * 1000)), 'CT')"]).\
-    count_by("trip_count", by = "timestamp").\
-    sort("timestamp").\
-    update(["day = dayOfYear(timestamp, 'CT')",
-            "month = monthOfYear(timestamp, 'CT')",
-            "year = year(timestamp, 'CT')"])
-
-hourly_ride_freq_by_day = hourly_ride_freq.\
-    agg_by([agg.avg("avg_by_day = trip_count"),
-            agg.std("std_by_day = trip_count")], by = ["day", "month", "year"])
-
-hourly_ride_freq_by_month = hourly_ride_freq.\
-    agg_by([agg.avg("avg_by_month = trip_count"),
-            agg.std("std_by_month = trip_count")], by = ["month", "year"])
-
-hourly_ride_freq_by_year = hourly_ride_freq.\
-    agg_by([agg.avg("avg_by_year = trip_count"),
-            agg.std("std_by_year = trip_count")], by = "year")
-
-hourly_ride_freq_stats = hourly_ride_freq_by_day.\
-    join(hourly_ride_freq_by_month, on = ["month", "year"], joins = ["avg_by_month", "std_by_month"]).\
-    join(hourly_ride_freq_by_year, on = "year", joins = ["avg_by_year", "std_by_year"])
+    trips = trips.\
+        join(trips.count_by("sub_count", by = "subscriber_type"), on = "subscriber_type", joins = "sub_count").\
+        where("sub_count >= 100").\
+        drop_columns("sub_count")
 
 
-daily_ride_freq = hourly_ride_freq.\
-    update("timestamp = atMidnight(timestamp, 'CT')").\
-    agg_by([agg.sum_("trip_count"), agg.first(["day", "month", "year"])], by = "timestamp")
+    ### Frequency analysis
 
-daily_ride_freq_by_month = daily_ride_freq.\
-    agg_by([agg.avg("avg_by_month = trip_count"),
-            agg.std("std_by_month = trip_count")], by = ["month", "year"])
+    # hourly and daily trip count
+    hourly_ride_freq = trips.\
+        update(["hour = hourOfDay(start_time, 'CT')",
+                "hour = hour == 24 ? 23 : hour",
+                "timestamp = toInstant(toLocalDate(start_time, 'CT'), millisOfDayToLocalTime((hour * 60 * 60 * 1000)), 'CT')"]).\
+        count_by("trip_count", by = "timestamp").\
+        sort("timestamp").\
+        update(["day = dayOfYear(timestamp, 'CT')",
+                "month = monthOfYear(timestamp, 'CT')",
+                "year = year(timestamp, 'CT')"])
 
-daily_ride_freq_by_year = daily_ride_freq.\
-    agg_by([agg.avg("avg_by_year = trip_count"),
-            agg.std("std_by_year = trip_count")], by = "year")
+    hourly_ride_freq_by_day = hourly_ride_freq.\
+        agg_by([agg.avg("avg_by_day = trip_count"),
+                agg.std("std_by_day = trip_count")], by = ["day", "month", "year"])
 
-daily_ride_freq_stats = daily_ride_freq_by_month.\
-    join(daily_ride_freq_by_year, on = "year", joins = ["avg_by_year", "std_by_year"])
+    hourly_ride_freq_by_month = hourly_ride_freq.\
+        agg_by([agg.avg("avg_by_month = trip_count"),
+                agg.std("std_by_month = trip_count")], by = ["month", "year"])
 
+    hourly_ride_freq_by_year = hourly_ride_freq.\
+        agg_by([agg.avg("avg_by_year = trip_count"),
+                agg.std("std_by_year = trip_count")], by = "year")
 
-# hourly trip rolling average and standardization
-hourly_ride_freq_avg = hourly_ride_freq.\
-    update_by(uby.rolling_avg_tick("trip_count_avg = trip_count", rev_ticks = 24, fwd_ticks = 24)).\
-    join(hourly_ride_freq_stats.first_by(["month", "year"]), on = ["month", "year"], joins = ["avg_by_month", "std_by_month"]).\
-    update("standardized_trip_count = (trip_count - avg_by_month) / std_by_month").\
-    update_by(uby.rolling_avg_tick("standardized_trip_count_avg = standardized_trip_count", rev_ticks = 12, fwd_ticks = 12), by = ["month", "year"])
-
-# daily trip count rolling average and standardization
-daily_ride_freq_avg = daily_ride_freq.\
-    update_by(uby.rolling_avg_tick("trip_count_avg = trip_count", rev_ticks = 15, fwd_ticks = 15)).\
-    where(["year > 2013", "year < 2017"]).\
-    join(daily_ride_freq_stats.first_by("year"), on = "year", joins = ["avg_by_year", "std_by_year"]).\
-    update("standardized_trip_count = (trip_count - avg_by_year) / std_by_year").\
-    update_by(uby.rolling_avg_tick("standardized_trip_count_avg = standardized_trip_count", rev_ticks = 15, fwd_ticks = 15), by = "year")
+    hourly_ride_freq_stats = hourly_ride_freq_by_day.\
+        join(hourly_ride_freq_by_month, on = ["month", "year"], joins = ["avg_by_month", "std_by_month"]).\
+        join(hourly_ride_freq_by_year, on = "year", joins = ["avg_by_year", "std_by_year"])
 
 
-### Duration analysis
+    daily_ride_freq = hourly_ride_freq.\
+        update("timestamp = atMidnight(timestamp, 'CT')").\
+        agg_by([agg.sum_("trip_count"), agg.first(["day", "month", "year"])], by = "timestamp")
 
-hourly_ride_dur = trips.\
-    update(["hour = hourOfDay(start_time, 'CT')",
-            "hour = hour == 24 ? 23 : hour",
-            "timestamp = toInstant(toLocalDate(start_time, 'CT'), millisOfDayToLocalTime((hour * 60 * 60 * 1000)), 'CT')"]).\
-    agg_by([agg.sum_("duration_sum = duration_minutes"),
-            agg.avg("duration_avg = duration_minutes"),
-            agg.median("duration_med = duration_minutes")], by = "timestamp").\
-    sort("timestamp").\
-    update(["day = dayOfYear(timestamp, 'CT')",
-            "month = monthOfYear(timestamp, 'CT')",
-            "year = year(timestamp, 'CT')"])
+    daily_ride_freq_by_month = daily_ride_freq.\
+        agg_by([agg.avg("avg_by_month = trip_count"),
+                agg.std("std_by_month = trip_count")], by = ["month", "year"])
 
-hourly_ride_dur_avg = hourly_ride_dur.\
-    update_by(uby.rolling_avg_time("timestamp",
-        ["duration_avg_sum = duration_sum",
-         "duration_avg_avg = duration_avg",
-         "duration_avg_med = duration_med"],
-        rev_time = "PT24h", fwd_time = "PT24h"))
+    daily_ride_freq_by_year = daily_ride_freq.\
+        agg_by([agg.avg("avg_by_year = trip_count"),
+                agg.std("std_by_year = trip_count")], by = "year")
 
-daily_ride_dur = trips.\
-    update(["timestamp = atMidnight(start_time, 'CT')"]).\
-    agg_by([agg.sum_("duration_sum = duration_minutes"),
-            agg.avg("duration_avg = duration_minutes"),
-            agg.median("duration_med = duration_minutes")], by = "timestamp").\
-    sort("timestamp").\
-    update(["day = dayOfYear(timestamp, 'CT')",
-            "month = monthOfYear(timestamp, 'CT')",
-            "year = year(timestamp, 'CT')"])
+    daily_ride_freq_stats = daily_ride_freq_by_month.\
+        join(daily_ride_freq_by_year, on = "year", joins = ["avg_by_year", "std_by_year"])
 
-daily_ride_dur_avg = daily_ride_dur.\
-    update_by(uby.rolling_avg_time("timestamp",
-        ["duration_avg_sum = duration_sum",
-         "duration_avg_avg = duration_avg",
-         "duration_avg_med = duration_med"],
-        rev_time = "P15D", fwd_time = "P15D"))
+
+    # hourly trip rolling average and standardization
+    hourly_ride_freq_avg = hourly_ride_freq.\
+        update_by(uby.rolling_avg_tick("trip_count_avg = trip_count", rev_ticks = 24, fwd_ticks = 24)).\
+        join(hourly_ride_freq_stats.first_by(["month", "year"]), on = ["month", "year"], joins = ["avg_by_month", "std_by_month"]).\
+        update("standardized_trip_count = (trip_count - avg_by_month) / std_by_month").\
+        update_by(uby.rolling_avg_tick("standardized_trip_count_avg = standardized_trip_count", rev_ticks = 12, fwd_ticks = 12), by = ["month", "year"])
+
+    # daily trip count rolling average and standardization
+    daily_ride_freq_avg = daily_ride_freq.\
+        update_by(uby.rolling_avg_tick("trip_count_avg = trip_count", rev_ticks = 15, fwd_ticks = 15)).\
+        where(["year > 2013", "year < 2017"]).\
+        join(daily_ride_freq_stats.first_by("year"), on = "year", joins = ["avg_by_year", "std_by_year"]).\
+        update("standardized_trip_count = (trip_count - avg_by_year) / std_by_year").\
+        update_by(uby.rolling_avg_tick("standardized_trip_count_avg = standardized_trip_count", rev_ticks = 15, fwd_ticks = 15), by = "year")
+
+
+    ### Duration analysis
+
+    hourly_ride_dur = trips.\
+        update(["hour = hourOfDay(start_time, 'CT')",
+                "hour = hour == 24 ? 23 : hour",
+                "timestamp = toInstant(toLocalDate(start_time, 'CT'), millisOfDayToLocalTime((hour * 60 * 60 * 1000)), 'CT')"]).\
+        agg_by([agg.sum_("duration_sum = duration_minutes"),
+                agg.avg("duration_avg = duration_minutes"),
+                agg.median("duration_med = duration_minutes")], by = "timestamp").\
+        sort("timestamp").\
+        update(["day = dayOfYear(timestamp, 'CT')",
+                "month = monthOfYear(timestamp, 'CT')",
+                "year = year(timestamp, 'CT')"])
+
+    hourly_ride_dur_avg = hourly_ride_dur.\
+        update_by(uby.rolling_avg_time("timestamp",
+            ["duration_avg_sum = duration_sum",
+             "duration_avg_avg = duration_avg",
+             "duration_avg_med = duration_med"],
+            rev_time = "PT24h", fwd_time = "PT24h"))
+
+    daily_ride_dur = trips.\
+        update(["timestamp = atMidnight(start_time, 'CT')"]).\
+        agg_by([agg.sum_("duration_sum = duration_minutes"),
+                agg.avg("duration_avg = duration_minutes"),
+                agg.median("duration_med = duration_minutes")], by = "timestamp").\
+        sort("timestamp").\
+        update(["day = dayOfYear(timestamp, 'CT')",
+                "month = monthOfYear(timestamp, 'CT')",
+                "year = year(timestamp, 'CT')"])
+
+    daily_ride_dur_avg = daily_ride_dur.\
+        update_by(uby.rolling_avg_time("timestamp",
+            ["duration_avg_sum = duration_sum",
+             "duration_avg_avg = duration_avg",
+             "duration_avg_med = duration_med"],
+            rev_time = "P15D", fwd_time = "P15D"))
+
+    return stations, trips, \
+        hourly_ride_freq, hourly_ride_freq_avg, daily_ride_freq, daily_ride_freq_stats, daily_ride_freq_avg, \
+        hourly_ride_dur, hourly_ride_dur_avg, daily_ride_dur, daily_ride_dur_avg
 
 
 ############################################################ APP #######################################################
 
-import deephaven.pandas as dhpd
+stations, trips, \
+    hourly_ride_freq, hourly_ride_freq_avg, daily_ride_freq, daily_ride_freq_stats, daily_ride_freq_avg, \
+    hourly_ride_dur, hourly_ride_dur_avg, daily_ride_dur, daily_ride_dur_avg = create_tables()
 
 MIN_DATE = dt.date(2013, 12, 22)
 MAX_DATE = dt.date(2017, 8, 1)
@@ -184,7 +195,6 @@ MONTH_INT_TO_STR = {1: "January", 2: "February", 3: "March", 4: "April", 5: "May
 
 WEEKDAY_STR_TO_INT = {"Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7}
 
-st.set_page_config(layout="wide")
 st.subheader("Austin Bikeshare Exploration")
 data_tab, time_tab, space_tab= st.tabs(["Raw Data", "Through Time", "Through Space"])
 
@@ -458,3 +468,44 @@ with time_tab:
                         y="duration_minutes"). \
                 show()
             display_dh(time_q8_plot)
+
+with space_tab:
+    space_c1, space_c2 = st.columns((0.3, 0.7))
+    stations_color = stations.update("color = status == `active` ? `#1EB025` : status == `closed` ? `#DF0B0B` : status == `moved` ? `#CDC70E` : `#1859EE`")
+
+    with space_c1:
+        st.multiselect("Select a station type.", ("active", "closed", "moved", "ACL only"),
+                       default = ("active", "closed", "moved", "ACL only"), key = "space_type")
+        st.radio("Size station points by:", ("None", "Starting point popularity", "End point popularity"), key = "space_size")
+        st.radio("Select a year.", ("All", 2013, 2014, 2015, 2016, 2017), key = "space_year", horizontal = True)
+        selectable_months = ["All", *[MONTH_INT_TO_STR[month] for month in AVAILABLE_MONTHS[st.session_state.space_year]]] \
+            if st.session_state.space_year != "All" else ["All", *MONTH_STR_TO_INT.keys()]
+        st.selectbox("Select a month.", selectable_months, key = "space_month")
+
+        if len(st.session_state.space_type) == 4:
+            space_table = stations_color
+        else:
+            space_table = stations_color.where_one_of(["status == `" + station_type + "`" for station_type in st.session_state.space_type])
+        if st.session_state.space_size != "None":
+            filtered_trips = trips
+            filter_query = []
+            if st.session_state.space_year != "All":
+                filter_query.append("year == " + str(st.session_state.space_year))
+            if st.session_state.space_month != "All":
+                filter_query.append("month == " + str(MONTH_STR_TO_INT[st.session_state.space_month]))
+            if filter_query:
+                filtered_trips = filtered_trips.\
+                    update(["year = year(start_time, 'CT')", "month = monthOfYear(start_time, 'CT')"]).\
+                    where(filter_query)
+            if st.session_state.space_size == "Starting point popularity":
+                space_table = space_table.join(filtered_trips.count_by("count", by = "start_station_id"), on = "station_id = start_station_id")
+            else:
+                space_table = space_table.join(filtered_trips.count_by("count", by="end_station_id"), on="station_id = end_station_id")
+
+    with space_c2:
+        space_table_df = dhpd.to_pandas(space_table)
+        if st.session_state.space_size != "None":
+            space_table_df["count"] = 2000 * space_table_df["count"] / space_table_df["count"].sum()
+            st.map(space_table_df, size="count", color="color", use_container_width=True)
+        else:
+            st.map(space_table_df, size=25, color="color", use_container_width=True)
