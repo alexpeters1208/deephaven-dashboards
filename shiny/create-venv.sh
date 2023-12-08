@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Create and activate virtual environment
-python -m venv dh-streamlit-venv
-source dh-streamlit-venv/bin/activate
+python -m venv dh-shiny-venv
+source dh-shiny-venv/bin/activate
 
 # Install streamlit and dh streamlit plugin
-pip install streamlit streamlit-deephaven deephaven-ipywidgets jupyter
+pip install shiny shinyswatch deephaven-ipywidgets jupyter
 
 # Clone the web-plugin-packager repository
 git clone https://github.com/deephaven/web-plugin-packager.git

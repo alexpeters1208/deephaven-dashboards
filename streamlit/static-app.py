@@ -21,7 +21,6 @@ import deephaven.time as dhtu
 import deephaven.pandas as dhpd
 
 # other imports
-
 import datetime as dt
 
 ############################################################ DATA #######################################################
