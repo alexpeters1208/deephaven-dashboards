@@ -1,0 +1,10 @@
+version: '3'
+services:
+  my-app:
+    container_name: deephaven-ui-bikeshare
+    image: ghcr.io/mofojed/deephaven-plugins:alpha
+    ports:
+      - "10000:10000"
+    volumes:
+      - ../data/static:/data
+      - ./notebooks:/data/storage/notebooks

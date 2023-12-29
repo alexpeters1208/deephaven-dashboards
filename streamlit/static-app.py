@@ -5,7 +5,7 @@ import streamlit as st
 from streamlit_deephaven import start_server, display_dh
 
 ### start the server
-s = start_server(port=10000, jvm_args=["-Xmx4g",
+s = start_server(port=10001, jvm_args=["-Xmx4g",
                                        "-DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler",
                                        "-Dprocess.info.system-info.enabled=false"])
 

@@ -160,7 +160,7 @@ def create_tables():
 
 ############################################################ APP #######################################################
 
-from shiny import App, render, ui
+from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 app_ui = ui.page_fluid(
     shinyswatch.theme.yeti(),
@@ -310,6 +310,20 @@ def server(input, output, session):
     def stations_dataset():
         return render.DataGrid(
             stations_df,
+            row_selection_mode="multiple",
+            width=773,
+            height=607,
+        )
+
+    @reactive.Calc
+    def create_queried_dataset():
+        return dhpd.to_pandas(eval(input.data_query()))
+
+    @output
+    @render.data_frame
+    def queried_dataset():
+        return render.DataGrid(
+            create_queried_dataset(),
             row_selection_mode="multiple",
             width=773,
             height=607,
