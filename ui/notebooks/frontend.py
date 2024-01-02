@@ -58,9 +58,21 @@ def raw_data_tab():
 
 @ui.component
 def daily_ride_count_tab():
+
+    plot = Figure().\
+        plot_xy(series_name="Daily ride count",
+                t=daily_ride_freq_avg,
+                x="timestamp",
+                y="trip_count").\
+        plot_xy(series_name="30-day rolling average",
+                t=daily_ride_freq_avg,
+                x="timestamp",
+                y="trip_count_avg").\
+        show()
+
     return ui.flex(
         ui.text("Select a date range."),
-        daily_ride_freq_avg,
+        plot,
         direction="column",
         flex_grow=1
     )
@@ -69,6 +81,19 @@ def daily_ride_count_tab():
 def hourly_ride_count_tab():
     valid_years = [2013, 2014, 2015, 2016, 2017]
     selected_year, set_selected_year = ui.use_state(2014)
+
+    plot = Figure(). \
+        plot_xy(series_name="Hourly ride count",
+                t=hourly_ride_freq_avg.where(["year == (int)selected_year",
+                                                "month == 3"]),
+                x="timestamp",
+                y="trip_count"). \
+        plot_xy(series_name="24-hour rolling average",
+                t=hourly_ride_freq_avg.where(["year == (int)selected_year",
+                                                "month == 3"]),
+                x="timestamp",
+                y="trip_count_avg"). \
+        show()
 
     return ui.flex(
         ui.flex(
@@ -83,7 +108,7 @@ def hourly_ride_count_tab():
             direction="row",
             flex_grow=1
         ),
-        hourly_ride_freq_avg.where(f"year == {selected_year}"),
+        plot,
         direction="column",
         flex_grow=1
     )
@@ -173,18 +198,13 @@ def hourly_ride_duration_tab():
         flex_grow=1
     )
 
-@ui.component
 def f():
-    print("hello!")
-    return ui.panel(
-        ui.text("hello"),
-        "Question 1"
-    )
+    test = ui.panel(ui.text("Hello"))
+    return None
 
 @ui.component
 def q1():
-    _, open_panel = ui.use_state("Q1")
-    return ui.action_button("Q1", on_press=lambda: open_panel(f()))
+    return ui.action_button("Q1", on_press=f)
 
 @ui.component
 def through_time_tab():
