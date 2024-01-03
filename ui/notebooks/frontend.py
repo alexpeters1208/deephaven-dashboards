@@ -1,6 +1,9 @@
 from deephaven import ui
 from deephaven.plot.figure import Figure
 
+import deephaven.agg as agg
+import deephaven.updateby as uby
+
 ######################
 #### RAW DATA TAB ####
 ######################
@@ -198,13 +201,202 @@ def hourly_ride_duration_tab():
         flex_grow=1
     )
 
-def f():
-    test = ui.panel(ui.text("Hello"))
-    return None
-
 @ui.component
 def q1():
-    return ui.action_button("Q1", on_press=f)
+    plot = Figure(). \
+        plot_pie(series_name="Ride Frequency by Subscription Type",
+                    t=trips.count_by("count", by="subscriber_type"),
+                    category="subscriber_type",
+                    y="count"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows how often users of each subscription types \
+                go for a ride. Note that the various subscription types have \
+                been aggregated into these 11 primary categories for simplicity."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q2():
+    plot = Figure(). \
+        plot_xy(series_name="Year-standardized trip count in 2014",
+                t=daily_ride_freq_avg.where("year == 2014").update("day_of_year = dayOfYear(timestamp, 'CT')"),
+                x="day_of_year",
+                y="standardized_trip_count_avg"). \
+        plot_xy(series_name="Year-standardized trip count in 2015",
+                t=daily_ride_freq_avg.where("year == 2015").update("day_of_year = dayOfYear(timestamp, 'CT')"),
+                x="day_of_year",
+                y="standardized_trip_count_avg"). \
+        plot_xy(series_name="Year-standardized trip count in 2016",
+                t=daily_ride_freq_avg.where("year == 2016").update("day_of_year = dayOfYear(timestamp, 'CT')"),
+                x="day_of_year",
+                y="standardized_trip_count_avg"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows trends from all three complete years. \
+                The differences in magnitude and variation have been \
+                removed to make the trend comparison as simple as possible."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q3():
+    plot = Figure(rows=1, cols=3). \
+        new_chart(row=0, col=0). \
+        plot_xy(series_name="2014",
+                t=hourly_ride_freq_avg.where(["year == 2014", "month == 3"]),
+                x="timestamp",
+                y="standardized_trip_count_avg"). \
+        new_chart(row=0, col=1). \
+        plot_xy(series_name="2015",
+                t=hourly_ride_freq_avg.where(["year == 2015", "month == 3"]),
+                x="timestamp",
+                y="standardized_trip_count_avg"). \
+        new_chart(row=0, col=2). \
+        plot_xy(series_name="2016",
+                t=hourly_ride_freq_avg.where(["year == 2016", "month == 3"]),
+                x="timestamp",
+                y="standardized_trip_count_avg"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows trends from the selected month from all three \
+                complete years. The differences in magnitude and variation have \
+                been removed to make the trend comparison as simple as possible."),
+        ui.text("Select a month."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q4():
+    plot = Figure(). \
+        plot_cat(series_name="2013",
+                    t=daily_ride_freq.where("year == 2013").agg_by(agg.sum_("trip_count"), by="month"),
+                    category="month", y="trip_count"). \
+        plot_cat(series_name="2014",
+                    t=daily_ride_freq.where("year == 2014").agg_by(agg.sum_("trip_count"), by="month"),
+                    category="month", y="trip_count"). \
+        plot_cat(series_name="2015",
+                    t=daily_ride_freq.where("year == 2015").agg_by(agg.sum_("trip_count"), by="month"),
+                    category="month", y="trip_count"). \
+        plot_cat(series_name="2016",
+                    t=daily_ride_freq.where("year == 2016").agg_by(agg.sum_("trip_count"), by="month"),
+                    category="month", y="trip_count"). \
+        plot_cat(series_name="2017",
+                    t=daily_ride_freq.where("year == 2017").agg_by(agg.sum_("trip_count"), by="month"),
+                    category="month", y="trip_count"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows the ride count by month for a given year. If all \
+                years are selected, only complete years will be included in the plot."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q5():
+    plot = Figure(rows=2, cols=1). \
+        new_chart(row=0, col=0). \
+        plot_xy_hist(series_name="Annual subscribers",
+                        t=trips.where("subscriber_type == `Annual Membership`"),
+                        x="duration_minutes",
+                        nbins=50,
+                        xmin=0.0,
+                        xmax=100.0). \
+        new_chart(row=1, col=0). \
+        plot_xy_hist(series_name="Non-annual subscribers",
+                        t=trips.where("subscriber_type != `Annual Membership`"),
+                        x="duration_minutes",
+                        nbins=50,
+                        xmin=0.0,
+                        xmax=100.0). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows the distribution of ride duration for annual \
+                subscribers and everyone else. Interestingly, annual subscribers \
+                tend to take shorter trips."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q6():
+    plot = Figure(). \
+        plot_pie(series_name="Long Rides by Subscription Type",
+                    t=trips.where("duration_minutes > 500").count_by("count", by="subscriber_type"),
+                    category="subscriber_type",
+                    y="count"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows the percentage of trips over 500 minutes taken \
+                by each subscription type. The majority of long trips were taken \
+                by walk-up customers."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q7():
+    day_of_week_name_array = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    q7_table = trips. \
+        update(["day_of_week = dayOfWeek(start_time, 'CT')", ]). \
+        agg_by([agg.avg("duration_avg = duration_minutes"),
+                agg.median("duration_med = duration_minutes")], by="day_of_week"). \
+        sort("day_of_week"). \
+        update("day_of_week_name = (String)day_of_week_name_array[i]")
+
+    plot = Figure(). \
+        plot_cat(series_name="Average ride duration", t=q7_table, category="day_of_week_name",
+                    y="duration_avg"). \
+        plot_cat(series_name="Median ride duration", t=q7_table, category="day_of_week_name",
+                    y="duration_med"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows the average and median number of rides taken each \
+                day of the week, aggregated over the entire dataset."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
+
+@ui.component
+def q8():
+    q8_table = trips. \
+        update(["day_of_week = dayOfWeek(start_time, 'CT')",
+                "minute_of_day = minuteOfDay(start_time, 'CT')"]). \
+        agg_by(agg.median("duration_minutes"), by=["minute_of_day", "day_of_week"]). \
+        sort("minute_of_day")
+
+    plot = Figure(). \
+        plot_xy(series_name="Median intraday ride duration",
+                t=q8_table.where("day_of_week == 4"),
+                x="minute_of_day",
+                y="duration_minutes"). \
+        show()
+
+    return ui.flex(
+        ui.text("This plot shows the median minutely ride duration within each day, \
+                aggregated over the entire dataset."),
+        ui.text("Select a day."),
+        plot,
+        direction="column",
+        flex_grow=1
+    )
 
 @ui.component
 def through_time_tab():
@@ -239,41 +431,44 @@ def through_time_tab():
 #### THROUGH SPACE TAB ####
 ###########################
 
-@ui.component
 def selection_panel():
-    return ui.flex(
-        ui.text("Select a station type."),
-        ui.text("Size station points by:"),
-        ui.button_group(
-            ui.button("None"),
-            ui.button("Starting point popularity"),
-            ui.button("Ending point popularity"),
-            direction="column"
-        ),
-        ui.text("Select a year."),
-        ui.button_group(
-            ui.button("All"),
-            ui.button(2013),
-            ui.button(2014),
-            ui.button(2015),
-            ui.button(2016),
-            ui.button(2017)
-        ),
-        ui.text("Select a month."),
-        direction="column",
-        flex_grow=1
-    )
+    valid_sizings = ["None", "Starting point popularity", "Ending point popularity"]
+    selected_sizing, set_selected_sizing = ui.use_state("None")
+    valid_years = ["All", 2013, 2014, 2015, 2016, 2017]
+    selected_year, set_selected_year = ui.use_state("All")
+
+    return selected_sizing, set_selected_sizing, \
+        selected_year, set_selected_year, \
+        ui.flex(
+            ui.text("Select a station type."),
+            ui.text("Size station points by:"),
+            ui.button_group(
+                *[ui.button(sizing, on_press = lambda sizing=sizing: set_selected_sizing(sizing)) for sizing in valid_sizings],
+                direction="column"
+            ),
+            ui.text("Select a year."),
+            ui.button_group(
+                *[ui.button(year, on_press = lambda year=year: set_selected_year(year)) for year in valid_years]
+            ),
+            ui.text("Select a month."),
+            direction="column",
+            flex_grow=1
+        )
 
 @ui.component
-def map_panel():
+def map_panel(sizing, set_sizing, year, set_year):
+    print(sizing, set_sizing, year, set_year)
     return ui.text("I'm a map")
+
+
 
 @ui.component
 def through_space_tab():
+    selected_sizing, set_selected_sizing, selected_year, set_selected_year, selections = selection_panel()
     return(
         ui.flex(
-            selection_panel(),
-            map_panel(),
+            selections,
+            map_panel(selected_sizing, set_selected_sizing, selected_year, set_selected_year),
             direction="row"
         )
     )
