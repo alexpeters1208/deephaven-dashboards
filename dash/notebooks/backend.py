@@ -2,7 +2,7 @@
 #### START DEEPHAVEN ####
 
 from deephaven_server import Server
-s = Server(port=10000, jvm_args=["-Xmx8g", "-Dprocess.info.system-info.enabled=false"])
+s = Server(port=10000, jvm_args=["-Xmx8g", "-Dprocess.info.system-info.enabled=false",  "-Dauthentication.psk=12345"])
 s.start()
 
 from deephaven.execution_context import get_exec_ctx
@@ -22,12 +22,17 @@ from deephaven.replay import TableReplayer
 
 #### INGEST DATA ####
 
-historical = read_csv("https://media.githubusercontent.com/media/deephaven/examples/main/CryptoCurrencyHistory/CSV/crypto_sept7.csv")
-#historical2 = read_csv("https://media.githubusercontent.com/media/deephaven/examples/main/CryptoCurrencyHistory/CSV/crypto_sept8.csv")
+data = read_csv(
+    "https://media.githubusercontent.com/media/deephaven/examples/main/CryptoCurrencyHistory/CSV/CryptoTrades_20210922.csv",
+    num_rows=250000
+)
 
-#replayer = TableReplayer("2021-09-08T04:00:00Z", "2021-09-09T05:00:00Z")
-#streaming = replayer.add_table(historical2.sort("dateTime"), "dateTime").sort_descending("dateTime")
-#replayer.start()
+historical = data.where("minuteOfDay(Timestamp, 'ET') < 60*12 + 30")
+historical2 = data.where("minuteOfDay(Timestamp, 'ET') >= 60*12 + 30")
+
+replayer = TableReplayer("2021-09-22T12:30:00.000 ET", "2021-09-22T13:01:48.054 ET")
+streaming = replayer.add_table(historical2.sort("Timestamp"), "Timestamp").sort_descending("Timestamp")
+replayer.start()
 
 def get_tables():
-    return CTX, historical
+    return CTX, historical, streaming

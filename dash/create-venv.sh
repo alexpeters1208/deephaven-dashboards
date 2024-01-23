@@ -5,7 +5,7 @@ python -m venv dh-dash-venv
 source dh-dash-venv/bin/activate
 
 # Install dash and relevant deephaven packages
-pip install dash plotly-express deephaven-server deephaven-ipywidgets
+pip install dash dash-bootstrap-components plotly-express deephaven-server deephaven-ipywidgets
 
 # Clone the web-plugin-packager repository
 git clone https://github.com/deephaven/web-plugin-packager.git

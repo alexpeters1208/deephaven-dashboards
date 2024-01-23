@@ -1,4 +1,5 @@
 deployment
+dash/dh-dash-venv
 streamlit/dh-streamlit-venv
 shiny/dh-shiny-venv
 ui/dh-ui-venv
